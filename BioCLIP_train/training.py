@@ -13,11 +13,11 @@ from model_utils import get_feats_and_meta
 from classifier import train, get_scores
 
 # Configuration         
-ROOT_DATA_DIR = Path("/path/to/your/project/data")
-DATA_FILE = ROOT_DATA_DIR / "ref" / "butterfly_anomaly_train.csv"
-IMG_DIR = ROOT_DATA_DIR / "images"
-CLF_SAVE_DIR = Path("/path/to/your/project/models/trained_clfs")
-DEVICE = "cuda:1"
+ROOT_DATA_DIR = Path("/home/jovyan/")
+DATA_FILE = ROOT_DATA_DIR / "butterfly_anomaly_train.csv"
+IMG_DIR = ROOT_DATA_DIR / "images_all"
+CLF_SAVE_DIR = Path("models/trained_clfs")
+DEVICE = "cuda:0"
 BATCH_SIZE = 4
 
 def setup_data_and_model():
@@ -43,6 +43,12 @@ def extract_features(tr_sig_dloader, test_dl, model):
 
 
 def train_and_evaluate(tr_features, tr_labels, test_features, test_labels):
+    import os
+    # Get the directory of your training script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Change the current working directory
+    os.chdir(script_dir)
     configs = ["svm","sgd","knn"]
     csv_output = []
     score_output = []
@@ -52,11 +58,19 @@ def train_and_evaluate(tr_features, tr_labels, test_features, test_labels):
         clf, acc, h_acc, nh_acc = train(tr_features, tr_labels, con)
 
         # Save model to the specified path
-        model_filename = CLF_SAVE_DIR / f"trained_{con}_classifier.pkl"
+        print(f"CLF_SAVE_DIR (inside train_and_evaluate): {CLF_SAVE_DIR}")
+        f_string_part = f"trained_{con}_classifier.pkl"
+        print(f"f-string part: {f_string_part}")
+        model_filename = os.path.join(CLF_SAVE_DIR, f_string_part)  # Use os.path.join
+        print(f"Final model_filename: {model_filename}")
+
+        # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(model_filename), exist_ok=True)
+
         with open(model_filename, 'wb') as model_file:
-            pickle.dump(clf, model_file)
+            pickle.dump(clf, model_file)  # Use pickle.dump to save the model
         print(f"Saved {con} classifier to {model_filename}")
-        print(f"{con}: Acc - {acc:.4f}, Hacc - {h_acc:.4f}, NHacc - {nh_acc:.4f}")
+        print(f"{con}: Acc - {{acc:.4f}}, Hacc - {{h_acc:.4f}}, NHacc - {{nh_acc:.4f}}")
         
         # Get scores for the test dataset
         scores = get_scores(clf, test_features)
