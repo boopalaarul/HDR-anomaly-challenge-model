@@ -7,8 +7,10 @@ class ButterflyClassDetector(nn.Module):
     #entropy. *even if it's not very good,* freeze & import into butterfly_hybrid_detector for next stage.
     
     """Initializer method. Specifies layers as `self.` attributes of class object."""
-    def __init__(self):
+    def __init__(self, num_classes = 2):
+        
         super().__init__()
+        
 
     """Feed forward method. Receives data input vector X and uses layers (as attributes specified in __init__) to transform it into 14 class response logits."""
     def forward(self, x):
