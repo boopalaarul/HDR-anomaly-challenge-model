@@ -19,5 +19,5 @@ class ButterflyClassDetector(nn.Module):
         #x_vector = self.flatten(x) 
         #pass inputs into 4 layer neural network
         #response_logits = self.linear_layer_stack(x_vector)
-        return response_logits
+        return response_logits #length 14
         
