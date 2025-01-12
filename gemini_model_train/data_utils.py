@@ -86,7 +86,7 @@ def data_transforms(train=True):
             transforms.RandomRotation(degrees=15),  # Example: Rotate
             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1), # Example: Adjust colors
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # ImageNet values
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     else:
         return transforms.Compose([
@@ -98,11 +98,11 @@ def data_transforms(train=True):
 
 def _filter(dataframe: pd.DataFrame, img_dir: str) -> pd.DataFrame:
     bad_row_idxs = []
-    
-    for idx, row in tqdm(dataframe.iterrows(), desc="Filtering bad urls"):
+
+    for idx, row in tqdm(dataframe.iterrows(), desc="Filtering bad urls", total=len(dataframe)):
         fname = row['filename']
         path = os.path.join(img_dir, fname)
-    
+
         if not os.path.exists(path):
             print(f"File not found: {path}")
             bad_row_idxs.append(idx)
@@ -114,22 +114,37 @@ def _filter(dataframe: pd.DataFrame, img_dir: str) -> pd.DataFrame:
                 bad_row_idxs.append(idx)
 
     print(f"Bad rows: {len(bad_row_idxs)}")
-
     return dataframe.drop(bad_row_idxs)
 
 def load_data(data_path: str, img_dir: str, test_size: float = 0.2, random_state: int = 42) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    df = _filter(pd.read_csv(data_path), img_dir)
-    label_column_name = 'hybrid_stat'  # Use 'hybrid_stat' as the label column
+    df = pd.read_csv(data_path)
 
-    # Map 'hybrid' to 1 and 'non-hybrid' to 0 in the 'hybrid_stat' column
-    df['label'] = df['hybrid_stat'].map({'hybrid': 1, 'non-hybrid': 0})
+    # Check if 'hybrid_stat' column exists
+    if 'hybrid_stat' not in df.columns:
+        raise ValueError("The CSV file must contain a column named 'hybrid_stat'.")
 
-    # Perform stratified split using the new 'label' column
+    df = _filter(df, img_dir)
+
+    # Map 'hybrid_stat' to numerical labels, handling variations in string format
+    df['label'] = df['hybrid_stat'].str.strip().str.lower().map({'hybrid': 1, 'non-hybrid': 0})
+
+    # Ensure that 'label' column only contains 0s and 1s after mapping
+    if not df['label'].isin([0, 1]).all():
+        raise ValueError("The 'label' column must contain only 0s and 1s after mapping.")
+
+    # Perform stratified split
     train_data, test_data = train_test_split(
         df,
         test_size=test_size,
         random_state=random_state,
-        stratify=df['label']  # Stratify using the new 'label' column
+        stratify=df['label']
     )
+
+    print(f"Number of training samples: {len(train_data)}")
+    print(f"Number of testing samples: {len(test_data)}")
+    print(f"Training set - Non-hybrid count: {len(train_data[train_data['label'] == 0])}")
+    print(f"Training set - Hybrid count: {len(train_data[train_data['label'] == 1])}")
+    print(f"Testing set - Non-hybrid count: {len(test_data[test_data['label'] == 0])}")
+    print(f"Testing set - Hybrid count: {len(test_data[test_data['label'] == 1])}")
 
     return train_data, test_data

@@ -134,6 +134,8 @@ from data_utils import data_transforms, load_data
 # from evaluation import evaluate, print_evaluation  # Remove if not using
 # from classifier import train, get_scores  # Remove if not using
 from model_utils import ButterflyNet  # Import your custom model
+from torch.optim.lr_scheduler import StepLR
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # ... (rest of your imports)
 
@@ -159,62 +161,101 @@ def setup_data_and_model():
 def prepare_data_loaders(train_data, test_data):
     train_sig_dset = ButterflyDataset(train_data, IMG_DIR, transforms=data_transforms(train=True))
     tr_sig_dloader = DataLoader(train_sig_dset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
-    
+
     test_dset = ButterflyDataset(test_data, IMG_DIR, transforms=data_transforms(train=False))
     test_dl = DataLoader(test_dset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
     return tr_sig_dloader, test_dl
 
+# In training.py, inside the train_and_evaluate function:
 def train_and_evaluate(model, tr_sig_dloader, test_dl, optimizer, criterion, num_epochs=10):
-    model.train()  # Set the model to training mode
+    model.train()
+
+    # Learning rate scheduler
+    scheduler = StepLR(optimizer, step_size=3, gamma=0.1)
+
+    # Calculate class weights (assuming imbalanced dataset)
+    num_non_hybrids = 1991
+    num_hybrids = 91
+    total_samples = num_non_hybrids + num_hybrids
+    class_weights = torch.tensor([total_samples / num_non_hybrids, total_samples / num_hybrids], dtype=torch.float).to(DEVICE)
+
+    # Use weighted loss function
+    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
 
     for epoch in range(num_epochs):
-        for batch_idx, (data, target) in enumerate(tr_sig_dloader): # Removed the two _
+        epoch_loss = 0.0
+        for batch_idx, (data, target) in enumerate(tr_sig_dloader):
             data, target = data.to(DEVICE), target.to(DEVICE)
 
             optimizer.zero_grad()
             output = model(data)
             loss = criterion(output, target)
             loss.backward()
+
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
             optimizer.step()
 
-            if batch_idx % 100 == 0:  # Print training progress
+            epoch_loss += loss.item()
+
+            if batch_idx % 100 == 0:
                 print(f"Epoch: {epoch+1}/{num_epochs}, Batch: {batch_idx}/{len(tr_sig_dloader)}, Loss: {loss.item():.4f}")
 
-        # Evaluate on the test set after each epoch (or more/less frequently)
-        model.eval()  # Set the model to evaluation mode
+        # Print average epoch loss
+        avg_epoch_loss = epoch_loss / len(tr_sig_dloader)
+        print(f"Epoch: {epoch+1}/{num_epochs}, Average Epoch Loss: {avg_epoch_loss:.4f}")
+
+        # Update learning rate
+        scheduler.step()
+        print(f"Learning rate updated to: {optimizer.param_groups[0]['lr']:.6f}")
+
+        # Evaluate on the test set
+        model.eval()
         test_loss = 0
         correct = 0
         with torch.no_grad():
-            for data, target in test_dl: # Removed the two _
+            all_preds = []
+            all_targets = []
+            for data, target in test_dl:
                 data, target = data.to(DEVICE), target.to(DEVICE)
                 output = model(data)
-                test_loss += criterion(output, target).item()  # Sum up batch loss
-                pred = output.argmax(dim=1, keepdim=True)  # Get the index of the max logit
-                correct += pred.eq(target.view_as(pred)).sum().item()
-
+                test_loss += criterion(output, target).item()
+                pred = output.argmax(dim=1, keepdim=True)
+        
+                all_preds.extend(pred.view(-1).cpu().numpy())
+                all_targets.extend(target.cpu().numpy())
+        
         test_loss /= len(test_dl.dataset)
-        accuracy = 100. * correct / len(test_dl.dataset)
-        print(f"Test set: Average loss: {test_loss:.4f}, Accuracy: {accuracy:.2f}%")
+        
+        # Calculate metrics using sklearn
+        accuracy = accuracy_score(all_targets, all_preds)
+        precision = precision_score(all_targets, all_preds)
+        recall = recall_score(all_targets, all_preds)
+        f1 = f1_score(all_targets, all_preds)
+        
+        print(f"Test set: Average loss: {test_loss:.4f}, Accuracy: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}")
 
-        model.train()  # Set back to training mode
+        model.train()
 
     return model
 
+# Update your main function to use the weighted loss
 def main():
     model, train_data, test_data = setup_data_and_model()
     tr_sig_dloader, test_dl = prepare_data_loaders(train_data, test_data)
 
     # Define the loss function and optimizer
-    criterion = torch.nn.CrossEntropyLoss()  # Example: Cross-entropy loss for classification
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # Example: Adam optimizer
+    criterion = torch.nn.CrossEntropyLoss() # Example: Cross-entropy loss for classification
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-5) # Example: Adam optimizer with weight decay
 
     # Fine-tune the model
     model = train_and_evaluate(model, tr_sig_dloader, test_dl, optimizer, criterion, num_epochs=NUM_EPOCHS)
 
     # Save the fine-tuned model
     model_filename = CLF_SAVE_DIR / "trained_butterfly_net.pth"
-    CLF_SAVE_DIR.mkdir(parents=True, exist_ok=True) #Ensure directory exists
+    CLF_SAVE_DIR.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), model_filename)
     print(f"Saved trained model to {model_filename}")
 
