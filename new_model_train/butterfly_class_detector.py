@@ -20,3 +20,4 @@ class ButterflyClassDetector(nn.Module):
         #pass inputs into 4 layer neural network
         #response_logits = self.linear_layer_stack(x_vector)
         return response_logits
+        
