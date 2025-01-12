@@ -127,6 +127,7 @@ from pathlib import Path
 import torch
 import pickle
 from torch.utils.data import DataLoader
+from torch.utils.data import WeightedRandomSampler
 # from open_clip import create_model  # Remove this line, as we're not using BioClip
 
 from dataset import ButterflyDataset
@@ -159,9 +160,24 @@ def setup_data_and_model():
     return model, train_data, test_data
 
 def prepare_data_loaders(train_data, test_data):
+    # Create dataset with filter
     train_sig_dset = ButterflyDataset(train_data, IMG_DIR, transforms=data_transforms(train=True))
-    tr_sig_dloader = DataLoader(train_sig_dset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
+    # Calculate class counts from the filtered dataset
+    class_counts = train_sig_dset.data['label'].value_counts().sort_index()
+
+    # Use the actual number of samples in the dataset for num_samples
+    num_samples = len(train_sig_dset)
+
+    # Calculate weights
+    class_weights = 1. / class_counts
+    weights = [class_weights[label] for label in train_sig_dset.labels]
+
+    # Create sampler
+    sampler = WeightedRandomSampler(weights=weights, num_samples=num_samples, replacement=True)
+
+    # Create DataLoaders
+    tr_sig_dloader = DataLoader(train_sig_dset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, sampler=sampler)
     test_dset = ButterflyDataset(test_data, IMG_DIR, transforms=data_transforms(train=False))
     test_dl = DataLoader(test_dset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
