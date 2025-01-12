@@ -13,11 +13,11 @@ from model_utils import get_feats_and_meta
 from classifier import train, get_scores
 
 # Configuration         
-ROOT_DATA_DIR = Path("/path/to/your/project/data")
-DATA_FILE = ROOT_DATA_DIR / "ref" / "butterfly_anomaly_train.csv"
-IMG_DIR = ROOT_DATA_DIR / "images"
-CLF_SAVE_DIR = Path("/path/to/your/project/models/trained_clfs")
-DEVICE = "cuda:1"
+ROOT_DATA_DIR = Path("/home/jovyan/")
+DATA_FILE = ROOT_DATA_DIR / "butterfly_anomaly_train.csv"
+IMG_DIR = ROOT_DATA_DIR / "images_all"
+CLF_SAVE_DIR = Path("models/trained_clfs")
+DEVICE = "cuda:0"
 BATCH_SIZE = 4
 
 def setup_data_and_model():
@@ -43,6 +43,12 @@ def extract_features(tr_sig_dloader, test_dl, model):
 
 
 def train_and_evaluate(tr_features, tr_labels, test_features, test_labels):
+    import os
+    # Get the directory of your training script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Change the current working directory
+    os.chdir(script_dir)
     configs = ["svm","sgd","knn"]
     csv_output = []
     score_output = []
