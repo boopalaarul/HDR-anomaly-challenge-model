@@ -1,3 +1,19 @@
+###TRAINING SUBSPECIES CLASSIFIER
+#It's fine to have separate methods for the base model
+#as for the hybrid classifier: the hybrid classifier is what gets benchmarked
+#against the competition. (SVM, KNN, etc.). 
+#If the premise is that near perfect subspecies classification -> better anomaly detection, 
+#then do the first part and test the second. Chances are it won't be entirely true:
+#(in which case, start unfreezing/requiring gradient updates on last layers of base model?)
+#but it will still be an interesting task of itself.
+
+#if there was a way to embed (LLM?) images into a lower dimensional space, and to have the presence
+#of hybrid features have an "additive"/"averaging" effect so that it could be found to be "between"
+#species to some threshold of "betweeenness"...
+
+#is there a way to "mask" out the pattern. We can already judge what is shared across all images.
+#All have the same "background" on their wings:
+
 #methods for loss, autodiff, etc.
 import torch
 #methods for saving and loading checkpoint/pickle files

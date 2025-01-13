@@ -1,9 +1,15 @@
+#methods for importing and reading the data CSV
+import csv
+from pathlib import Path
+
 from torch.utils.data import Dataset
 from PIL import Image
 import os
 import pandas as pd
 
+"""Class for the hybrid classification. Its labels are 'hybrid_stat', not 'subspecies'."""
 class ButterflyDataset(Dataset):
+    #from init should be able to specify *which task*
     def __init__(self, data, root_dir, transforms=None):
         self.data = data
         self.root_dir = root_dir
